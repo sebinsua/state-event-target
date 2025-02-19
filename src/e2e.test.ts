@@ -2,25 +2,37 @@
  * @vitest-environment happy-dom
  */
 import { describe, it, expect, vi } from "vitest";
-import { source } from "./source/source";
-import { sink } from "./sink/sink";
+import { source } from "./source";
+import { sink } from "./sink";
 import { KVDataEventTarget } from "./KVDataEventTarget";
+import { WindowBroadcastTarget } from "./BroadcastTarget/WindowBroadcastTarget";
+import { WindowBroadcastSource } from "./BroadcastSource/WindowBroadcastSource";
 
 describe("source() and sink() integration", () => {
   it("should sync state updates from source to sink", async () => {
     const globalState = new KVDataEventTarget<string, string>();
     const replicatedState = new KVDataEventTarget<string, string>();
 
-    const stateSource = source(globalState, "test-namespace", {
-      eventsToBroadcast: ["state:update"],
-    });
+    const stateSource = source(
+      new WindowBroadcastTarget(window),
+      globalState,
+      "test-namespace",
+      {
+        eventsToBroadcast: ["state:update"],
+      },
+    );
 
     const updateHandler = vi.fn();
-    const stateSink = sink(replicatedState, "test-namespace", {
-      "state:update": (target, detail) => {
-        target.set(detail.key, detail.value);
+    const stateSink = sink(
+      new WindowBroadcastSource(window),
+      replicatedState,
+      "test-namespace",
+      {
+        "state:update": (target, detail) => {
+          target.set(detail.key, detail.value);
+        },
       },
-    });
+    );
 
     stateSink.addEventListener("state:update", updateHandler);
 
@@ -41,21 +53,31 @@ describe("source() and sink() integration", () => {
     const globalState = new KVDataEventTarget<string, string>();
     const replicatedState = new KVDataEventTarget<string, string>();
 
-    const stateSource = source(globalState, "test-namespace", {
-      eventsToBroadcast: ["state:update", "state:request"],
-    });
-    const stateSink = sink(replicatedState, "test-namespace", {
-      "state:request": (target, detail) => {
-        const value = globalState.read(detail.key);
-        if (value !== undefined) {
-          target.set(
-            detail.key,
-            // @ts-expect-error
-            value,
-          );
-        }
+    const stateSource = source(
+      new WindowBroadcastTarget(window),
+      globalState,
+      "test-namespace",
+      {
+        eventsToBroadcast: ["state:update", "state:request"],
       },
-    });
+    );
+    const stateSink = sink(
+      new WindowBroadcastSource(window),
+      replicatedState,
+      "test-namespace",
+      {
+        "state:request": (target, detail) => {
+          const value = globalState.read(detail.key);
+          if (value !== undefined) {
+            target.set(
+              detail.key,
+              // @ts-expect-error
+              value,
+            );
+          }
+        },
+      },
+    );
 
     stateSource.set("theme", "light");
 
@@ -79,15 +101,25 @@ describe("source() and sink() integration", () => {
     const globalState = new KVDataEventTarget<string, string>();
     const replicatedState = new KVDataEventTarget<string, string>();
 
-    const stateSource = source(globalState, "test-namespace", {
-      eventsToBroadcast: ["state:reset", "state:update"],
-    });
-    const stateSink = sink(replicatedState, "test-namespace", {
-      "state:update": (target, detail) => {
-        target.set(detail.key, detail.value);
+    const stateSource = source(
+      new WindowBroadcastTarget(window),
+      globalState,
+      "test-namespace",
+      {
+        eventsToBroadcast: ["state:reset", "state:update"],
       },
-      "state:reset": (target) => target.clear(),
-    });
+    );
+    const stateSink = sink(
+      new WindowBroadcastSource(window),
+      replicatedState,
+      "test-namespace",
+      {
+        "state:update": (target, detail) => {
+          target.set(detail.key, detail.value);
+        },
+        "state:reset": (target) => target.clear(),
+      },
+    );
 
     stateSource.set("theme", "dark");
 
