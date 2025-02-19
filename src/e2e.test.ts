@@ -2,8 +2,8 @@
  * @vitest-environment happy-dom
  */
 import { describe, it, expect, vi } from "vitest";
-import { source } from "./source";
-import { sink } from "./sink";
+import { source } from "./source/source";
+import { sink } from "./sink/sink";
 import { KVDataEventTarget } from "./KVDataEventTarget";
 
 describe("source() and sink() integration", () => {
