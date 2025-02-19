@@ -13,15 +13,34 @@ export class DataEventTarget<T> extends EventTarget {
     }
   }
 
+  /**
+   * Read attempts to return the current value synchronously if one exists,
+   * but otherwise returns a Promise that will resolve when a value is set.
+   */
   read(): T | PromiseWithMeta<T> {
     const p = this.getAsync();
     return p.status === "fulfilled" ? p.value! : p;
   }
 
+  /**
+   * Prime ensures there is a Promise ready to receive a future value.
+   * Useful for setting up the Promise before you need the value.
+   */
+  prime() {
+    void this.getAsync();
+  }
+
+  /**
+   * Peek will always synchronously read the value.
+   * It will return undefined if no value has been set yet.
+   */
   peek(): T | undefined {
     return this.#promise?.value;
   }
 
+  /**
+   * GetAsync will always return a *stable* Promise that resolves when a value is set.
+   */
   getAsync(): PromiseWithMeta<T> {
     if (!this.#promise) {
       this.#promise = attachPromiseMeta(
@@ -34,6 +53,9 @@ export class DataEventTarget<T> extends EventTarget {
     return this.#promise;
   }
 
+  /**
+   * Sets the value, resolving any pending Promises.
+   */
   set(value: T) {
     for (const pendingResolver of this.#pendingResolvers) {
       pendingResolver(value);

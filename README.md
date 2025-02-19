@@ -17,13 +17,19 @@
 
 ## TODO
 
-- integrate automatic state:request in sink's read/peek/getAsync so missing keys trigger a fetch
+#### data targets
+
 - cache responses so subsequent reads are synchronous
+- add robust error handling and race condition management for async state requests
+- add a "prime" method to proactively fetch keys before read, returning a promise once loaded
+- store version and last update `performance.now()` to avoid stale data
+
+#### sink/source
+
+- integrate automatic state:request in sink's read/peek/getAsync so missing keys trigger a fetch
 - auto-generate unique IDs for sinks (and possibly the source) to allow for targeted messaging
 - allow source configuration: either broadcast the full snapshot on connection or respond only to granular key requests
 - let the source decide between global broadcasts or targeting specific sinks based on their IDs
-- add robust error handling and race condition management for async state requests
-- add a "prime" method to proactively fetch keys before read, returning a promise once loaded
 - include versioning/sequence/timestamps in update events to coordinate state updates and avoid stale data
 
 ## Usage
