@@ -10,6 +10,7 @@ type PromiseResolver<T> = (value: T | PromiseLike<T>) => void;
 export class KVDataEventTarget<K, V> extends EventTarget {
   #promises: Map<K, PromiseWithMeta<V>> = new Map();
   #pendingResolvers: Map<K, PromiseResolver<V>[]> = new Map();
+  lastUpdated = performance.now();
 
   /**
    * Read attempts to return the current value synchronously if one exists,
@@ -81,6 +82,8 @@ export class KVDataEventTarget<K, V> extends EventTarget {
     this.dispatchEvent(
       new CustomEvent("state:update", { detail: { key, value } }),
     );
+
+    this.lastUpdated = performance.now();
   }
 
   clear() {

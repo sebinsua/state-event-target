@@ -5,6 +5,7 @@ type PromiseResolver<T> = (value: T | PromiseLike<T>) => void;
 export class DataEventTarget<T> extends EventTarget {
   #promise?: PromiseWithMeta<T>;
   #pendingResolvers: PromiseResolver<T>[] = [];
+  lastUpdated = performance.now();
 
   constructor(initialValue?: T) {
     super();
@@ -73,6 +74,8 @@ export class DataEventTarget<T> extends EventTarget {
     }
 
     this.dispatchEvent(new CustomEvent("state:update", { detail: value }));
+
+    this.lastUpdated = performance.now();
   }
 
   clear() {
