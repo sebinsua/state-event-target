@@ -43,9 +43,9 @@ const stateSink = sink(
 );
 
 // Initial read is asynchronous
-console.log(await stateSink.read("123"));
+console.log(await stateSink.read("theme"));
 // Subsequent reads are synchronous
-console.log(stateSink.read("123"));
+console.log(stateSink.read("theme"));
 
 stateSink.addEventListener("state:update", (event) => {
   console.log("state:update:", event.detail);
