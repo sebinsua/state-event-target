@@ -13,7 +13,7 @@
 
 ## Introduction
 
-`state-event-target` is a state store with a primary source and synchronized replicas across frames, workers, and shared contexts. It uses `EventTarget` to emit updates and ensure reactive state consistency.
+`state-event-target` is a state store with a primary source and synchronized replicas across frames (and, if implemented by the developer, workers, and shared contexts). It uses `EventTarget` to emit updates and ensure reactive state consistency.
 
 ## Usage
 
