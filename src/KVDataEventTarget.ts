@@ -8,9 +8,29 @@ export interface KVEvents<K, V> {
 type PromiseResolver<T> = (value: T | PromiseLike<T>) => void;
 
 export class KVDataEventTarget<K, V> extends EventTarget {
+  #abortController = new AbortController();
   #promises: Map<K, PromiseWithMeta<V>> = new Map();
   #pendingResolvers: Map<K, PromiseResolver<V>[]> = new Map();
   lastUpdated = performance.now();
+
+  constructor() {
+    super();
+
+    this.addEventListener(
+      "state:prime",
+      (event) => {
+        const key = (event as CustomEvent).detail.key;
+        const value = this.peek(key);
+        if (value !== undefined) {
+          this.dispatchEvent(
+            new CustomEvent("state:update", { detail: { key, value } }),
+          );
+        }
+        this.prime(key);
+      },
+      { signal: this.#abortController.signal },
+    );
+  }
 
   /**
    * Read attempts to return the current value synchronously if one exists,
@@ -51,6 +71,7 @@ export class KVDataEventTarget<K, V> extends EventTarget {
         }),
       );
       this.#promises.set(key, p);
+      this.dispatchEvent(new CustomEvent("state:missing", { detail: { key } }));
     }
 
     return this.#promises.get(key)!;
@@ -86,6 +107,12 @@ export class KVDataEventTarget<K, V> extends EventTarget {
     this.lastUpdated = performance.now();
   }
 
+  onMissing(cb: EventListener) {
+    this.addEventListener("state:missing", cb, {
+      signal: this.#abortController.signal,
+    });
+  }
+
   clear() {
     this.#promises.clear();
     this.#pendingResolvers.clear();
@@ -94,6 +121,7 @@ export class KVDataEventTarget<K, V> extends EventTarget {
 
   destroy() {
     this.clear();
+    this.#abortController.abort();
   }
 
   addEventListener<K extends keyof KVEvents<K, V>>(

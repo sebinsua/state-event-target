@@ -3,6 +3,7 @@ import { attachPromiseMeta, PromiseWithMeta } from "./PromiseWithMeta";
 type PromiseResolver<T> = (value: T | PromiseLike<T>) => void;
 
 export class DataEventTarget<T> extends EventTarget {
+  #abortController = new AbortController();
   #promise?: PromiseWithMeta<T>;
   #pendingResolvers: PromiseResolver<T>[] = [];
   lastUpdated = performance.now();
@@ -12,6 +13,20 @@ export class DataEventTarget<T> extends EventTarget {
     if (initialValue !== undefined) {
       this.set(initialValue);
     }
+
+    this.addEventListener(
+      "state:prime",
+      (event) => {
+        const value = this.peek();
+        if (value !== undefined) {
+          this.dispatchEvent(
+            new CustomEvent("state:update", { detail: { value } }),
+          );
+        }
+        this.prime();
+      },
+      { signal: this.#abortController.signal },
+    );
   }
 
   /**
@@ -49,6 +64,7 @@ export class DataEventTarget<T> extends EventTarget {
           this.#pendingResolvers.push(resolve);
         }),
       );
+      this.dispatchEvent(new CustomEvent("state:missing", { detail: {} }));
     }
 
     return this.#promise;
@@ -73,9 +89,15 @@ export class DataEventTarget<T> extends EventTarget {
       this.#promise.value = value;
     }
 
-    this.dispatchEvent(new CustomEvent("state:update", { detail: value }));
+    this.dispatchEvent(new CustomEvent("state:update", { detail: { value } }));
 
     this.lastUpdated = performance.now();
+  }
+
+  onMissing(cb: EventListener) {
+    this.addEventListener("state:missing", cb, {
+      signal: this.#abortController.signal,
+    });
   }
 
   clear() {
@@ -86,5 +108,6 @@ export class DataEventTarget<T> extends EventTarget {
 
   destroy() {
     this.clear();
+    this.#abortController.abort();
   }
 }

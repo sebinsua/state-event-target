@@ -5,8 +5,8 @@ import { describe, it, expect, vi } from "vitest";
 import { source } from "./source";
 import { sink } from "./sink";
 import { KVDataEventTarget } from "./KVDataEventTarget";
-import { WindowBroadcastTarget } from "./BroadcastTarget/WindowBroadcastTarget";
-import { WindowBroadcastSource } from "./BroadcastSource/WindowBroadcastSource";
+import { WindowBroadcast } from "./Broadcast";
+import { DataEventTarget } from "./DataEventTarget";
 
 describe("source() and sink() integration", () => {
   it("should sync state updates from source to sink", async () => {
@@ -14,87 +14,65 @@ describe("source() and sink() integration", () => {
     const replicatedState = new KVDataEventTarget<string, string>();
 
     const stateSource = source(
-      new WindowBroadcastTarget(window),
+      new WindowBroadcast(window, window),
       globalState,
-      "test-namespace",
-      {
-        eventsToBroadcast: ["state:update"],
-      },
+      "test-namespace-1",
     );
 
     const updateHandler = vi.fn();
     const stateSink = sink(
-      new WindowBroadcastSource(window),
+      new WindowBroadcast(window, window),
       replicatedState,
-      "test-namespace",
-      {
-        "state:update": (target, detail) => {
-          target.set(detail.key, detail.value);
-        },
-      },
+      "test-namespace-1",
     );
 
     stateSink.addEventListener("state:update", updateHandler);
 
-    // Set value in source
-    stateSource.set("theme", "dark");
+    try {
+      // Set value in source
+      stateSource.set("theme", "dark");
 
-    // Simulate cross-context message delivery
-    await new Promise((resolve) => setTimeout(resolve, 50));
+      // Simulate cross-context message delivery
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Sink should have received the update
-    expect(stateSink.read("theme")).toBe("dark");
-    expect(updateHandler).toHaveBeenCalledWith(
-      expect.objectContaining({ detail: { key: "theme", value: "dark" } }),
-    );
+      // Sink should have received the update
+      expect(stateSink.read("theme")).toBe("dark");
+      expect(updateHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ detail: { key: "theme", value: "dark" } }),
+      );
+    } finally {
+      stateSource.destroy();
+      stateSink.destroy();
+    }
   });
 
-  it("should allow sink to request state from source", async () => {
-    const globalState = new KVDataEventTarget<string, string>();
-    const replicatedState = new KVDataEventTarget<string, string>();
+  it("should automatically request missing state from source", async () => {
+    const sourceState = new KVDataEventTarget<string, string>();
+    const sinkState = new KVDataEventTarget<string, string>();
 
     const stateSource = source(
-      new WindowBroadcastTarget(window),
-      globalState,
-      "test-namespace",
-      {
-        eventsToBroadcast: ["state:update", "state:request"],
-      },
+      new WindowBroadcast(window, window),
+      sourceState,
+      "test-namespace-2",
     );
     const stateSink = sink(
-      new WindowBroadcastSource(window),
-      replicatedState,
-      "test-namespace",
-      {
-        "state:request": (target, detail) => {
-          const value = globalState.read(detail.key);
-          if (value !== undefined) {
-            target.set(
-              detail.key,
-              // @ts-expect-error
-              value,
-            );
-          }
-        },
-      },
+      new WindowBroadcast(window, window),
+      sinkState,
+      "test-namespace-2",
     );
 
-    stateSource.set("theme", "light");
+    try {
+      // Set value in source
+      sourceState.set("theme", "dark");
 
-    // Sink requests state
-    window.postMessage(
-      {
-        type: "state:request",
-        namespace: "test-namespace",
-        detail: { key: "theme" },
-      },
-      "*",
-    );
+      // Sink requests missing value
+      const value = await sinkState.getAsync("theme");
 
-    // Simulate message delay
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    expect(stateSink.read("theme")).toBe("light");
+      expect(value).toBe("dark");
+    } finally {
+      stateSource.destroy();
+      stateSink.destroy();
+    }
   });
 
   it("should handle state reset across source and sink", async () => {
@@ -102,40 +80,72 @@ describe("source() and sink() integration", () => {
     const replicatedState = new KVDataEventTarget<string, string>();
 
     const stateSource = source(
-      new WindowBroadcastTarget(window),
+      new WindowBroadcast(window, window),
       globalState,
-      "test-namespace",
-      {
-        eventsToBroadcast: ["state:reset", "state:update"],
-      },
+      "test-namespace-3",
     );
     const stateSink = sink(
-      new WindowBroadcastSource(window),
+      new WindowBroadcast(window, window),
       replicatedState,
-      "test-namespace",
-      {
-        "state:update": (target, detail) => {
-          target.set(detail.key, detail.value);
-        },
-        "state:reset": (target) => target.clear(),
-      },
+      "test-namespace-3",
     );
 
-    stateSource.set("theme", "dark");
+    try {
+      stateSource.set("theme", "dark");
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(stateSink.read("theme")).toBe("dark");
+      expect(stateSink.read("theme")).toBe("dark");
 
-    stateSource.clear();
+      stateSource.clear();
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-    await expect(
-      Promise.race([
-        stateSink.read("theme"),
-        new Promise((_, reject) => setTimeout(reject, 50)),
-      ]),
-    ).rejects.toBeUndefined();
+      await expect(
+        Promise.race([
+          stateSink.read("theme"),
+          new Promise((_, reject) => setTimeout(reject, 50)),
+        ]),
+      ).rejects.toBeUndefined();
+    } finally {
+      stateSource.destroy();
+      stateSink.destroy();
+    }
+  });
+
+  it("should support syncing behaviours using `DataEventTarget`", async () => {
+    const sourceState = new DataEventTarget<string>();
+    const sinkState = new DataEventTarget<string>();
+
+    const stateSource = source(
+      new WindowBroadcast(window, window),
+      sourceState,
+      "test-namespace-4",
+    );
+    const stateSink = sink(
+      new WindowBroadcast(window, window),
+      sinkState,
+      "test-namespace-4",
+    );
+
+    try {
+      sourceState.set("dark");
+
+      const value = await sinkState.getAsync();
+      expect(value).toBe("dark");
+
+      sourceState.clear();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      await expect(
+        Promise.race([
+          stateSink.read(),
+          new Promise((_, reject) => setTimeout(reject, 50)),
+        ]),
+      ).rejects.toBeUndefined();
+    } finally {
+      stateSource.destroy();
+      stateSink.destroy();
+    }
   });
 });

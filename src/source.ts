@@ -1,25 +1,47 @@
-import { BroadcastTarget } from "./BroadcastTarget/BroadcastTarget";
+import { WindowBroadcast } from "./Broadcast";
 
-export function source<T extends EventTarget>(
-  toBroadcastTarget: BroadcastTarget,
+const DEFAULT_EVENTS_TO_BROADCAST = ["state:update", "state:reset"];
+
+export function source<T extends EventTarget & { lastUpdated?: number }>(
+  toBroadcastTarget: WindowBroadcast,
   fromSourceTarget: T,
   namespace: string,
-  config: { eventsToBroadcast: string[] },
+  config: { id?: string; eventsToBroadcast?: string[] } = {},
 ): T {
+  const eventsToBroadcast =
+    config.eventsToBroadcast ?? DEFAULT_EVENTS_TO_BROADCAST;
+
   function handleEvent(event: Event) {
     const customEvent = event as CustomEvent<any>;
-    if (!config.eventsToBroadcast.includes(customEvent.type)) {
+    if (!eventsToBroadcast.includes(customEvent.type)) {
       return;
     }
 
-    toBroadcastTarget.sendMessage(
-      customEvent.type,
-      namespace,
-      customEvent.detail,
-    );
+    const detail = customEvent.detail;
+    if (detail) {
+      if (config.id) {
+        detail.id = config.id;
+      }
+      if (fromSourceTarget.lastUpdated) {
+        detail.timestamp = fromSourceTarget.lastUpdated;
+      }
+    }
+
+    toBroadcastTarget.sendMessage(customEvent.type, namespace, detail);
   }
 
-  for (const eventName of config.eventsToBroadcast) {
+  toBroadcastTarget.onMessage((event: MessageEvent) => {
+    const { type, namespace: msgNamespace, detail } = event.data;
+    if (msgNamespace !== namespace) {
+      return;
+    }
+    if (type !== "state:request") {
+      return;
+    }
+
+    fromSourceTarget.dispatchEvent(new CustomEvent("state:prime", { detail }));
+  });
+  for (const eventName of eventsToBroadcast) {
     fromSourceTarget.addEventListener(eventName, handleEvent);
   }
 

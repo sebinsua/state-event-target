@@ -1,14 +1,32 @@
-import { BroadcastSource } from "./BroadcastSource/BroadcastSource";
+import { WindowBroadcast } from "./Broadcast";
 
-export function sink<T extends EventTarget>(
-  fromBroadcastSource: BroadcastSource,
+type SinkEventTarget = EventTarget & {
+  set: (...args: any[]) => void;
+  clear: () => void;
+  onMissing: (cb: EventListener) => void;
+};
+
+type SinkEventHandlers<T extends SinkEventTarget> = {
+  [eventType: string]: (target: T, detail: any) => void;
+};
+
+export function sink<T extends SinkEventTarget>(
+  fromBroadcastSource: WindowBroadcast,
   toSinkTarget: T,
   namespace: string,
-  eventHandlers: { [eventType: string]: (target: T, detail: any) => void },
+  eventHandlers: SinkEventHandlers<T> = {
+    "state:update": (target, detail) =>
+      "key" in detail
+        ? target.set(detail.key, detail.value)
+        : target.set(detail.value),
+    "state:reset": (target) => target.clear(),
+  },
 ): T {
   function handleMessage(event: MessageEvent<any>) {
     const { type, namespace: msgNamespace, detail } = event.data;
-    if (msgNamespace !== namespace) return;
+    if (msgNamespace !== namespace) {
+      return;
+    }
 
     if (eventHandlers[type]) {
       eventHandlers[type](toSinkTarget, detail);
@@ -18,6 +36,14 @@ export function sink<T extends EventTarget>(
   }
 
   fromBroadcastSource.onMessage(handleMessage);
+  toSinkTarget.onMissing((e: Event) => {
+    const detail = (e as CustomEvent).detail;
+    fromBroadcastSource.sendMessage(
+      "state:request",
+      namespace,
+      detail && "key" in detail ? { key: detail.key } : {},
+    );
+  });
 
   return new Proxy(toSinkTarget, {
     get(obj, prop) {

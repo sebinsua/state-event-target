@@ -15,27 +15,18 @@
 
 `state-event-target` is a state store with a primary source and synchronized replicas across frames, workers, and shared contexts. It uses `EventTarget` to emit updates and ensure reactive state consistency.
 
-## TODO
-
-#### sink/source
-
-- middleman the "prime" method to proactively fetch keys before read
-- integrate automatic state:request in sink's read/peek/getAsync so missing keys trigger a fetch
-- auto-generate unique IDs for sinks (and possibly the source) to allow for targeted messaging
-- allow source configuration: either broadcast the full snapshot on connection or respond only to granular key requests
-- let the source decide between global broadcasts or targeting specific sinks based on their IDs
-- include versioning/sequence/timestamps in update events to coordinate state updates and avoid stale data
-
 ## Usage
 
 ### Source
 
 ```ts
-import { KVDataEventTarget, source } from "state-event-target";
+import { KVDataEventTarget, source, WindowBroadcast } from "state-event-target";
 
-const stateSource = source(new KVDataEventTarget(), "demo", {
-  eventsToBroadcast: ["state:update"],
-});
+const stateSource = source(
+  new WindowBroadcast(window, Array.from(window.frames)),
+  new KVDataEventTarget(),
+  "demo",
+);
 
 stateSource.set("theme", "dark");
 ```
@@ -43,12 +34,13 @@ stateSource.set("theme", "dark");
 ### Sink
 
 ```ts
-import { KVDataEventTarget, sink } from "state-event-target";
+import { KVDataEventTarget, sink, WindowBroadcast } from "state-event-target";
 
-const stateSink = sink(new KVDataEventTarget(), "demo", {
-  "state:update": (target, { key, value }) => target.set(key, value),
-  "state:reset": (target) => target.clear(),
-});
+const stateSink = sink(
+  new WindowBroadcast(window, window.parent),
+  new KVDataEventTarget(),
+  "demo",
+);
 
 // Initial read is asynchronous
 console.log(await stateSink.read("123"));

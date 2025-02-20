@@ -45,7 +45,7 @@ describe("DataEventTarget", () => {
     state.set("event-driven");
 
     expect(callback).toHaveBeenCalledWith(
-      expect.objectContaining({ detail: "event-driven" }),
+      expect.objectContaining({ detail: { value: "event-driven" } }),
     );
   });
 
