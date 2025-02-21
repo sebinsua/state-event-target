@@ -79,7 +79,8 @@ export class DataEventTarget<T> extends EventTarget {
     }
     this.#pendingResolvers = [];
 
-    if (!this.#promise) {
+    const existing = this.#promise;
+    if (!existing || existing.value !== value) {
       this.#promise = attachPromiseMeta(
         new Promise((resolve) => {
           this.#pendingResolvers.push(resolve);

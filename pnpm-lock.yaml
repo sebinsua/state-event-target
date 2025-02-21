@@ -23,6 +23,9 @@ importers:
       prettier:
         specifier: ^3.5.1
         version: 3.5.1
+      swr-cache-event-target:
+        specifier: ^0.0.7
+        version: 0.0.7
       typescript:
         specifier: ^5.7.0
         version: 5.7.3
@@ -1341,6 +1344,10 @@ packages:
   supports-preserve-symlinks-flag@1.0.0:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
+
+  swr-cache-event-target@0.0.7:
+    resolution: {integrity: sha512-7+sOh+Z0gfQUxLWODhhWn/2BbTw1ll8fkScBvNv6mxXOWgKjaIxqGFmcvUYU5GjsCzXWgSm1QjL+Y9NoSxPjuw==}
+    engines: {node: '>=20'}
 
   test-exclude@7.0.1:
     resolution: {integrity: sha512-pFYqmTw68LXVjeWJMST4+borgQP2AyMNbg1BpZh9LbyhUeNkeaPF9gzfPGUAnSMV3qPYdWUwDIjjCLiSDOl7vg==}
@@ -2750,6 +2757,8 @@ snapshots:
       has-flag: 4.0.0
 
   supports-preserve-symlinks-flag@1.0.0: {}
+
+  swr-cache-event-target@0.0.7: {}
 
   test-exclude@7.0.1:
     dependencies:

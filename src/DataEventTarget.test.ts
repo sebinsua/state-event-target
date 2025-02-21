@@ -7,17 +7,22 @@ describe("DataEventTarget", () => {
 
     const p1 = state.getAsync();
     const p2 = state.getAsync();
-    // Must return the same promise before resolution
+    // Same promise, no value yet.
     expect(p1).toBe(p2);
 
+    // Same value
     state.set("hello");
-
-    const value = await p1;
-    expect(value).toBe("hello");
-
     const p3 = state.getAsync();
-    // Must return the resolved promise
-    expect(p3).toBe(p1);
+    const p4 = state.getAsync();
+    expect(p3).toBe(p4);
+    state.set("hello");
+    const p5 = state.getAsync();
+    expect(p3).toBe(p5);
+
+    // Different value
+    state.set("world");
+    const p6 = state.getAsync();
+    expect(p3).not.toBe(p6);
   });
 
   it("should resolve getAsync() when value is set", async () => {

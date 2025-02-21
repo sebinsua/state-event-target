@@ -54,6 +54,7 @@
     "happy-dom": "^17.1.0",
     "prettier": "^3.5.1",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "swr-cache-event-target": "^0.0.7"
   }
 }

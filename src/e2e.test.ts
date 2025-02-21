@@ -8,6 +8,8 @@ import { KVDataEventTarget } from "./KVDataEventTarget";
 import { WindowBroadcast } from "./Broadcast";
 import { DataEventTarget } from "./DataEventTarget";
 
+import { SwrCache } from "swr-cache-event-target";
+
 describe("source() and sink() integration", () => {
   it("should sync state updates from source to sink", async () => {
     const globalState = new KVDataEventTarget<string, string>();
@@ -146,6 +148,49 @@ describe("source() and sink() integration", () => {
     } finally {
       stateSource.destroy();
       stateSink.destroy();
+    }
+  });
+
+  it("should sync SWR cache refreshes across contexts", async () => {
+    const swrCache = new SwrCache({
+      getValue: async (key) => ({
+        value: `value-${key}`,
+        timestamp: Date.now(),
+      }),
+      ttlMs: 50,
+      refreshIntervalMs: 100,
+    });
+
+    const sourceBroadcast = source(
+      new WindowBroadcast(window, window),
+      swrCache,
+      "cache-namespace",
+    );
+
+    const kvDataTarget = new KVDataEventTarget<
+      string,
+      { value: string; timestamp: number }
+    >();
+    const sinkBroadcast = sink(
+      new WindowBroadcast(window, window),
+      kvDataTarget,
+      "cache-namespace",
+    );
+
+    try {
+      // Initial fetch triggers source cache
+      const initial = await kvDataTarget.getAsync("test-key");
+      const initialTimestamp = initial.timestamp;
+
+      // Wait for refresh
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Should have new timestamp from source refresh
+      const updated = await kvDataTarget.getAsync("test-key");
+      expect(updated.timestamp).toBeGreaterThan(initialTimestamp);
+    } finally {
+      sourceBroadcast.destroy();
+      sinkBroadcast.destroy();
     }
   });
 });

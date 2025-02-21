@@ -2,21 +2,27 @@ import { describe, it, expect, vi } from "vitest";
 import { KVDataEventTarget } from "../src/KVDataEventTarget";
 
 describe("KVDataEventTarget", () => {
-  it("should return a stable promise per key in getAsync", async () => {
+  it("should return a stable promise per key-value in getAsync", async () => {
     const store = new KVDataEventTarget<string, number>();
 
     const p1 = store.getAsync("key1");
     const p2 = store.getAsync("key1");
-    // Same promise for same key
+    // Same key, no value yet.
     expect(p1).toBe(p2);
 
+    // Same key, same value.
     store.set("key1", 99);
-    const value = await p1;
-    expect(value).toBe(99);
-
     const p3 = store.getAsync("key1");
-    // Must return the resolved promise
-    expect(p3).toBe(p1);
+    const p4 = store.getAsync("key1");
+    expect(p3).toBe(p4);
+    store.set("key1", 99);
+    const p5 = store.getAsync("key1");
+    expect(p3).toBe(p5);
+
+    // Same key, different value.
+    store.set("key1", 101);
+    const p6 = store.getAsync("key1");
+    expect(p3).not.toBe(p6);
   });
 
   it("should resolve getAsync() when value is set", async () => {

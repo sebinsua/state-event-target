@@ -86,7 +86,8 @@ export class KVDataEventTarget<K, V> extends EventTarget {
     }
     this.#pendingResolvers.set(key, []);
 
-    if (!this.#promises.has(key)) {
+    const existing = this.#promises.get(key);
+    if (!existing || existing.value !== value) {
       const p = attachPromiseMeta(
         new Promise<V>((resolve) => {
           this.#pendingResolvers.set(key, [
