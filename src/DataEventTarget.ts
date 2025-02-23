@@ -1,14 +1,14 @@
 import { attachPromiseMeta, PromiseWithMeta } from "./PromiseWithMeta";
 
-type PromiseResolver<T> = (value: T | PromiseLike<T>) => void;
+type PromiseResolver<Value> = (value: Value | PromiseLike<Value>) => void;
 
-export class DataEventTarget<T> extends EventTarget {
+export class DataEventTarget<Value> extends EventTarget {
   #abortController = new AbortController();
-  #promise?: PromiseWithMeta<T>;
-  #pendingResolvers: PromiseResolver<T>[] = [];
+  #promise?: PromiseWithMeta<Value>;
+  #pendingResolvers: PromiseResolver<Value>[] = [];
   lastUpdated = performance.now();
 
-  constructor(initialValue?: T) {
+  constructor(initialValue?: Value) {
     super();
     if (initialValue !== undefined) {
       this.set(initialValue);
@@ -33,7 +33,7 @@ export class DataEventTarget<T> extends EventTarget {
    * Read attempts to return the current value synchronously if one exists,
    * but otherwise returns a Promise that will resolve when a value is set.
    */
-  read(): T | PromiseWithMeta<T> {
+  read(): Value | PromiseWithMeta<Value> {
     const p = this.getAsync();
     return p.status === "fulfilled" ? p.value! : p;
   }
@@ -50,14 +50,14 @@ export class DataEventTarget<T> extends EventTarget {
    * Peek will always synchronously read the value.
    * It will return undefined if no value has been set yet.
    */
-  peek(): T | undefined {
+  peek(): Value | undefined {
     return this.#promise?.value;
   }
 
   /**
    * GetAsync will always return a *stable* Promise that resolves when a value is set.
    */
-  getAsync(): PromiseWithMeta<T> {
+  getAsync(): PromiseWithMeta<Value> {
     if (!this.#promise) {
       this.#promise = attachPromiseMeta(
         new Promise((resolve) => {
@@ -73,7 +73,7 @@ export class DataEventTarget<T> extends EventTarget {
   /**
    * Sets the value, resolving any pending Promises.
    */
-  set(value: T) {
+  set(value: Value) {
     for (const pendingResolver of this.#pendingResolvers) {
       pendingResolver(value);
     }

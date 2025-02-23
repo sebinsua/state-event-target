@@ -12,8 +12,8 @@ import { SwrCache } from "swr-cache-event-target";
 
 describe("source() and sink() integration", () => {
   it("should sync state updates from source to sink", async () => {
-    const globalState = new KVDataEventTarget<string, string>();
-    const replicatedState = new KVDataEventTarget<string, string>();
+    const globalState = new KVDataEventTarget<string, string, string>();
+    const replicatedState = new KVDataEventTarget<string, string, string>();
 
     const stateSource = source(
       new WindowBroadcast(window, window),
@@ -40,7 +40,9 @@ describe("source() and sink() integration", () => {
       // Sink should have received the update
       expect(stateSink.read("theme")).toBe("dark");
       expect(updateHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ detail: { key: "theme", value: "dark" } }),
+        expect.objectContaining({
+          detail: { param: "theme", key: "theme", value: "dark" },
+        }),
       );
     } finally {
       stateSource.destroy();
@@ -49,8 +51,8 @@ describe("source() and sink() integration", () => {
   });
 
   it("should automatically request missing state from source", async () => {
-    const sourceState = new KVDataEventTarget<string, string>();
-    const sinkState = new KVDataEventTarget<string, string>();
+    const sourceState = new KVDataEventTarget<string, string, string>();
+    const sinkState = new KVDataEventTarget<string, string, string>();
 
     const stateSource = source(
       new WindowBroadcast(window, window),
@@ -78,8 +80,8 @@ describe("source() and sink() integration", () => {
   });
 
   it("should handle state reset across source and sink", async () => {
-    const globalState = new KVDataEventTarget<string, string>();
-    const replicatedState = new KVDataEventTarget<string, string>();
+    const globalState = new KVDataEventTarget<string, string, string>();
+    const replicatedState = new KVDataEventTarget<string, string, string>();
 
     const stateSource = source(
       new WindowBroadcast(window, window),
@@ -152,11 +154,16 @@ describe("source() and sink() integration", () => {
   });
 
   it("should sync SWR cache refreshes across contexts", async () => {
-    const swrCache = new SwrCache({
-      getValue: async (key) => ({
-        value: `value-${key}`,
+    type CacheParam = { type: string; id: string };
+    type CacheValue = { value: string; timestamp: number };
+    const getKey = (param: CacheParam) => `${param.type}:${param.id}`;
+
+    const swrCache = new SwrCache<CacheParam, CacheValue>({
+      getValue: async (param) => ({
+        value: `value-${param.type}-${param.id}`,
         timestamp: Date.now(),
       }),
+      getKey,
       ttlMs: 50,
       refreshIntervalMs: 100,
     });
@@ -167,10 +174,9 @@ describe("source() and sink() integration", () => {
       "cache-namespace",
     );
 
-    const kvDataTarget = new KVDataEventTarget<
-      string,
-      { value: string; timestamp: number }
-    >();
+    const kvDataTarget = new KVDataEventTarget<CacheParam, CacheValue, string>({
+      getKey,
+    });
     const sinkBroadcast = sink(
       new WindowBroadcast(window, window),
       kvDataTarget,
@@ -178,15 +184,17 @@ describe("source() and sink() integration", () => {
     );
 
     try {
+      const testParam = { type: "user", id: "123" };
+
       // Initial fetch triggers source cache
-      const initial = await kvDataTarget.getAsync("test-key");
+      const initial = await kvDataTarget.getAsync(testParam);
       const initialTimestamp = initial.timestamp;
 
       // Wait for refresh
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Should have new timestamp from source refresh
-      const updated = await kvDataTarget.getAsync("test-key");
+      const updated = await kvDataTarget.getAsync(testParam);
       expect(updated.timestamp).toBeGreaterThan(initialTimestamp);
     } finally {
       sourceBroadcast.destroy();

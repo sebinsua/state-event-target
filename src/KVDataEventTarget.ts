@@ -1,29 +1,48 @@
 import { attachPromiseMeta, PromiseWithMeta } from "./PromiseWithMeta";
 
-export interface KVEvents<K, V> {
-  "state:update": CustomEvent<{ key: K; value: V }>;
+function defaultGetKey<Param, Key>(param: Param): Key {
+  return param as unknown as Key;
+}
+
+export interface KVEvents<Param, Key, Value> {
+  "state:update": CustomEvent<{ param: Param; key: Key; value: Value }>;
   "state:reset": CustomEvent<void>;
 }
 
 type PromiseResolver<T> = (value: T | PromiseLike<T>) => void;
 
-export class KVDataEventTarget<K, V> extends EventTarget {
+interface KVDataEventTargetConfig<Param, Key> {
+  getKey?: (param: Param) => Key;
+}
+
+export class KVDataEventTarget<Param, Value, Key = Param> extends EventTarget {
+  #config: Required<KVDataEventTargetConfig<Param, Key>>;
   #abortController = new AbortController();
-  #promises: Map<K, PromiseWithMeta<V>> = new Map();
-  #pendingResolvers: Map<K, PromiseResolver<V>[]> = new Map();
+  #promises: Map<Key, PromiseWithMeta<Value>> = new Map();
+  #pendingResolvers: Map<Key, PromiseResolver<Value>[]> = new Map();
+
   lastUpdated = performance.now();
 
-  constructor() {
+  constructor(config?: KVDataEventTargetConfig<Param, Key>) {
     super();
+
+    this.#config = {
+      getKey: defaultGetKey,
+      ...config,
+    };
 
     this.addEventListener(
       "state:prime",
       (event) => {
-        const key = (event as CustomEvent).detail.key;
-        const value = this.peek(key);
+        const detail = (event as CustomEvent).detail;
+        const [key, param] =
+          "param" in detail
+            ? [this.#config.getKey(detail.param), detail.param]
+            : [detail.key, detail.key as Param];
+        const value = this.peek(param);
         if (value !== undefined) {
           this.dispatchEvent(
-            new CustomEvent("state:update", { detail: { key, value } }),
+            new CustomEvent("state:update", { detail: { param, key, value } }),
           );
         }
         this.prime(key);
@@ -36,8 +55,8 @@ export class KVDataEventTarget<K, V> extends EventTarget {
    * Read attempts to return the current value synchronously if one exists,
    * but otherwise returns a Promise that will resolve when a value is set.
    */
-  read(key: K): V | Promise<V> {
-    const p = this.getAsync(key);
+  read(param: Param): Value | Promise<Value> {
+    const p = this.getAsync(param);
     return p.status === "fulfilled" ? p.value! : p;
   }
 
@@ -45,25 +64,27 @@ export class KVDataEventTarget<K, V> extends EventTarget {
    * Prime ensures there is a Promise ready to receive a future value.
    * Useful for setting up the Promise before you need the value.
    */
-  prime(key: K) {
-    void this.getAsync(key);
+  prime(param: Param) {
+    void this.getAsync(param);
   }
 
   /**
    * Peek will always synchronously read the value.
    * It will return undefined if no value has been set yet.
    */
-  peek(key: K): V | undefined {
+  peek(param: Param): Value | undefined {
+    const key = this.#config.getKey(param);
     return this.#promises.get(key)?.value;
   }
 
   /**
    * GetAsync will always return a *stable* Promise that resolves when a value is set.
    */
-  getAsync(key: K): PromiseWithMeta<V> {
+  getAsync(param: Param): PromiseWithMeta<Value> {
+    const key = this.#config.getKey(param);
     if (!this.#promises.has(key)) {
       const p = attachPromiseMeta(
-        new Promise<V>((resolve) => {
+        new Promise<Value>((resolve) => {
           this.#pendingResolvers.set(key, [
             ...(this.#pendingResolvers.get(key) ?? []),
             resolve,
@@ -71,7 +92,9 @@ export class KVDataEventTarget<K, V> extends EventTarget {
         }),
       );
       this.#promises.set(key, p);
-      this.dispatchEvent(new CustomEvent("state:missing", { detail: { key } }));
+      this.dispatchEvent(
+        new CustomEvent("state:missing", { detail: { param, key } }),
+      );
     }
 
     return this.#promises.get(key)!;
@@ -80,7 +103,9 @@ export class KVDataEventTarget<K, V> extends EventTarget {
   /**
    * Sets the value, resolving any pending Promises.
    */
-  set(key: K, value: V) {
+  set(param: Param, value: Value) {
+    const key = this.#config.getKey(param);
+
     for (const pendingResolver of this.#pendingResolvers.get(key) ?? []) {
       pendingResolver(value);
     }
@@ -89,7 +114,7 @@ export class KVDataEventTarget<K, V> extends EventTarget {
     const existing = this.#promises.get(key);
     if (!existing || existing.value !== value) {
       const p = attachPromiseMeta(
-        new Promise<V>((resolve) => {
+        new Promise<Value>((resolve) => {
           this.#pendingResolvers.set(key, [
             ...(this.#pendingResolvers.get(key) ?? []),
             resolve,
@@ -102,7 +127,7 @@ export class KVDataEventTarget<K, V> extends EventTarget {
     }
 
     this.dispatchEvent(
-      new CustomEvent("state:update", { detail: { key, value } }),
+      new CustomEvent("state:update", { detail: { param, key, value } }),
     );
 
     this.lastUpdated = performance.now();
@@ -125,9 +150,9 @@ export class KVDataEventTarget<K, V> extends EventTarget {
     this.#abortController.abort();
   }
 
-  addEventListener<K extends keyof KVEvents<K, V>>(
+  addEventListener<K extends keyof KVEvents<Param, Key, Value>>(
     type: K,
-    listener: (ev: KVEvents<K, V>[K]) => void,
+    listener: (ev: KVEvents<Param, K, Value>[K]) => void,
     options?: boolean | AddEventListenerOptions,
   ): void;
   addEventListener(
@@ -147,9 +172,9 @@ export class KVDataEventTarget<K, V> extends EventTarget {
     super.addEventListener(type, listener, opts);
   }
 
-  removeEventListener<K extends keyof KVEvents<K, V>>(
+  removeEventListener<K extends keyof KVEvents<Param, Key, Value>>(
     type: K,
-    listener: (ev: KVEvents<K, V>[K]) => void,
+    listener: (ev: KVEvents<Param, K, Value>[K]) => void,
     options?: boolean | EventListenerOptions,
   ): void;
   removeEventListener(

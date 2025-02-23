@@ -50,7 +50,9 @@ describe("KVDataEventTarget", () => {
     store.set("user", "Alice");
 
     expect(callback).toHaveBeenCalledWith(
-      expect.objectContaining({ detail: { key: "user", value: "Alice" } }),
+      expect.objectContaining({
+        detail: { param: "user", key: "user", value: "Alice" },
+      }),
     );
   });
 

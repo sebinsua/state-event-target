@@ -15,10 +15,13 @@ export function sink<T extends SinkEventTarget>(
   toSinkTarget: T,
   namespace: string,
   eventHandlers: SinkEventHandlers<T> = {
-    "state:update": (target, detail) =>
-      "key" in detail
-        ? target.set(detail.key, detail.value)
-        : target.set(detail.value),
+    "state:update": (target, detail) => {
+      if ("param" in detail || "key" in detail) {
+        target.set(detail.param ?? detail.key, detail.value);
+      } else {
+        target.set(detail.value);
+      }
+    },
     "state:reset": (target) => target.clear(),
   },
 ): T {
@@ -38,11 +41,17 @@ export function sink<T extends SinkEventTarget>(
   fromBroadcastSource.onMessage(handleMessage);
   toSinkTarget.onMissing((e: Event) => {
     const detail = (e as CustomEvent).detail;
-    fromBroadcastSource.sendMessage(
-      "state:request",
-      namespace,
-      detail && "key" in detail ? { key: detail.key } : {},
-    );
+    if (detail) {
+      fromBroadcastSource.sendMessage(
+        "state:request",
+        namespace,
+        "param" in detail
+          ? { param: detail.param }
+          : "key" in detail
+            ? { key: detail.key }
+            : {},
+      );
+    }
   });
 
   return new Proxy(toSinkTarget, {
