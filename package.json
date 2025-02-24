@@ -1,6 +1,6 @@
 {
   "name": "state-event-target",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Primary state with event-driven replicas.",
   "author": "Seb Insua",
   "license": "MIT",
