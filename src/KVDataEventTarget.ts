@@ -23,13 +23,33 @@ export class KVDataEventTarget<Param, Value, Key = Param> extends EventTarget {
 
   lastUpdated = performance.now();
 
-  constructor(config?: KVDataEventTargetConfig<Param, Key>) {
+  constructor(
+    initialEntries?: readonly (readonly [Param, Value])[] | null,
+    config?: KVDataEventTargetConfig<Param, Key>,
+  ) {
     super();
 
     this.#config = {
       getKey: defaultGetKey,
       ...config,
     };
+
+    if (initialEntries) {
+      for (const [param, value] of initialEntries) {
+        const key = this.#config.getKey(param);
+        const p = attachPromiseMeta(
+          new Promise<Value>((resolve) => {
+            this.#pendingResolvers.set(key, [
+              ...(this.#pendingResolvers.get(key) ?? []),
+              resolve,
+            ]);
+          }),
+        );
+        p.status = "fulfilled";
+        p.value = value;
+        this.#promises.set(key, p);
+      }
+    }
 
     this.addEventListener(
       "state:prime",

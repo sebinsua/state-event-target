@@ -174,9 +174,10 @@ describe("source() and sink() integration", () => {
       "cache-namespace",
     );
 
-    const kvDataTarget = new KVDataEventTarget<CacheParam, CacheValue, string>({
-      getKey,
-    });
+    const kvDataTarget = new KVDataEventTarget<CacheParam, CacheValue, string>(
+      [],
+      { getKey },
+    );
     const sinkBroadcast = sink(
       new WindowBroadcast(window, window),
       kvDataTarget,
