@@ -42,15 +42,16 @@ export function sink<T extends SinkEventTarget>(
   toSinkTarget.onMissing((e: Event) => {
     const detail = (e as CustomEvent).detail;
     if (detail) {
-      fromBroadcastSource.sendMessage(
-        "state:request",
+      fromBroadcastSource.postMessage({
+        type: "state:request",
         namespace,
-        "param" in detail
-          ? { param: detail.param }
-          : "key" in detail
-            ? { key: detail.key }
-            : {},
-      );
+        detail:
+          "param" in detail
+            ? { param: detail.param }
+            : "key" in detail
+              ? { key: detail.key }
+              : {},
+      });
     }
   });
 

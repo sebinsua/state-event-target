@@ -27,7 +27,11 @@ export function source<T extends EventTarget & { lastUpdated?: number }>(
       }
     }
 
-    toBroadcastTarget.sendMessage(customEvent.type, namespace, detail);
+    toBroadcastTarget.postMessage({
+      type: customEvent.type,
+      namespace,
+      detail,
+    });
   }
 
   toBroadcastTarget.onMessage((event: MessageEvent) => {

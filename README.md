@@ -23,7 +23,7 @@
 import { KVDataEventTarget, source, WindowBroadcast } from "state-event-target";
 
 const stateSource = source(
-  new WindowBroadcast(window, Array.from(window.frames)),
+  new WindowBroadcast(window, () => Array.from(window.frames)),
   new KVDataEventTarget(),
   "demo",
 );
