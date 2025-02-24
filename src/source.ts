@@ -3,7 +3,7 @@ import { WindowBroadcast } from "./Broadcast";
 const DEFAULT_EVENTS_TO_BROADCAST = ["state:update", "state:reset"];
 
 export function source<T extends EventTarget & { lastUpdated?: number }>(
-  toBroadcastTarget: WindowBroadcast,
+  toBroadcastTarget: WindowBroadcast<any>,
   fromSourceTarget: T,
   namespace: string,
   config: { id?: string; eventsToBroadcast?: string[] } = {},

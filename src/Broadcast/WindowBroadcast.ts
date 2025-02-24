@@ -1,22 +1,21 @@
 import { Broadcast, BroadcastMessageType } from "./Broadcast";
 
-export class WindowBroadcast extends Broadcast<BroadcastMessageType> {
+export class WindowBroadcast<
+  MessageType extends BroadcastMessageType,
+> extends Broadcast<MessageType> {
   constructor(
     private receiver: Window,
-    private sender:
-      | Window
-      | Window[]
-      | ((message: BroadcastMessageType) => Window[]),
+    private sender: Window | Window[] | ((message: MessageType) => Window[]),
   ) {
     super();
   }
 
-  onMessage(handler: (event: MessageEvent<BroadcastMessageType>) => void) {
+  onMessage(handler: (event: MessageEvent<MessageType>) => void) {
     this.receiver.addEventListener("message", handler, { signal: this.signal });
   }
 
   postMessage(
-    message: BroadcastMessageType,
+    message: MessageType,
     { targetOrigin = "*", transfer }: WindowPostMessageOptions = {},
   ) {
     const senders =

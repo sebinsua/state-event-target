@@ -12,123 +12,104 @@ import { SwrCache } from "swr-cache-event-target";
 
 describe("source() and sink() integration", () => {
   it("should sync state updates from source to sink", async () => {
-    const globalState = new KVDataEventTarget<string, string, string>();
-    const replicatedState = new KVDataEventTarget<string, string, string>();
-
-    const stateSource = source(
+    const sourceState = source(
       new WindowBroadcast(window, window),
-      globalState,
+      new KVDataEventTarget<string, string>(),
       "test-namespace-1",
     );
 
     const updateHandler = vi.fn();
-    const stateSink = sink(
+    const sinkState = sink(
       new WindowBroadcast(window, window),
-      replicatedState,
+      new KVDataEventTarget<string, string>(),
       "test-namespace-1",
     );
 
-    stateSink.addEventListener("state:update", updateHandler);
+    sinkState.addEventListener("state:update", updateHandler);
 
     try {
-      // Set value in source
-      stateSource.set("theme", "dark");
+      sourceState.set("theme", "dark");
 
-      // Simulate cross-context message delivery
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Sink should have received the update
-      expect(stateSink.read("theme")).toBe("dark");
+      expect(sinkState.read("theme")).toBe("dark");
       expect(updateHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           detail: { param: "theme", key: "theme", value: "dark" },
         }),
       );
     } finally {
-      stateSource.destroy();
-      stateSink.destroy();
+      sourceState.destroy();
+      sinkState.destroy();
     }
   });
 
   it("should automatically request missing state from source", async () => {
-    const sourceState = new KVDataEventTarget<string, string, string>();
-    const sinkState = new KVDataEventTarget<string, string, string>();
-
-    const stateSource = source(
+    const sourceState = source(
       new WindowBroadcast(window, window),
-      sourceState,
+      new KVDataEventTarget<string, string>(),
       "test-namespace-2",
     );
-    const stateSink = sink(
+    const sinkState = sink(
       new WindowBroadcast(window, window),
-      sinkState,
+      new KVDataEventTarget<string, string>(),
       "test-namespace-2",
     );
 
     try {
-      // Set value in source
       sourceState.set("theme", "dark");
 
-      // Sink requests missing value
       const value = await sinkState.getAsync("theme");
 
       expect(value).toBe("dark");
     } finally {
-      stateSource.destroy();
-      stateSink.destroy();
+      sourceState.destroy();
+      sinkState.destroy();
     }
   });
 
   it("should handle state reset across source and sink", async () => {
-    const globalState = new KVDataEventTarget<string, string, string>();
-    const replicatedState = new KVDataEventTarget<string, string, string>();
-
-    const stateSource = source(
+    const sourceState = source(
       new WindowBroadcast(window, window),
-      globalState,
+      new KVDataEventTarget<string, string>(),
       "test-namespace-3",
     );
-    const stateSink = sink(
+    const sinkState = sink(
       new WindowBroadcast(window, window),
-      replicatedState,
+      new KVDataEventTarget<string, string>(),
       "test-namespace-3",
     );
 
     try {
-      stateSource.set("theme", "dark");
+      sourceState.set("theme", "dark");
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(stateSink.read("theme")).toBe("dark");
-
-      stateSource.clear();
+      sourceState.clear();
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       await expect(
         Promise.race([
-          stateSink.read("theme"),
+          sinkState.read("theme"),
           new Promise((_, reject) => setTimeout(reject, 50)),
         ]),
       ).rejects.toBeUndefined();
     } finally {
-      stateSource.destroy();
-      stateSink.destroy();
+      sourceState.destroy();
+      sinkState.destroy();
     }
   });
 
   it("should support syncing behaviours using `DataEventTarget`", async () => {
-    const sourceState = new DataEventTarget<string>();
-    const sinkState = new DataEventTarget<string>();
-
-    const stateSource = source(
+    const sourceState = source(
       new WindowBroadcast(window, window),
-      sourceState,
+      new DataEventTarget<string>(),
       "test-namespace-4",
     );
-    const stateSink = sink(
+    const sinkState = sink(
       new WindowBroadcast(window, window),
-      sinkState,
+      new DataEventTarget<string>(),
       "test-namespace-4",
     );
 
@@ -143,44 +124,41 @@ describe("source() and sink() integration", () => {
 
       await expect(
         Promise.race([
-          stateSink.read(),
+          sinkState.read(),
           new Promise((_, reject) => setTimeout(reject, 50)),
         ]),
       ).rejects.toBeUndefined();
     } finally {
-      stateSource.destroy();
-      stateSink.destroy();
+      sourceState.destroy();
+      sinkState.destroy();
     }
   });
 
   it("should sync SWR cache refreshes across contexts", async () => {
     type CacheParam = { type: string; id: string };
     type CacheValue = { value: string; timestamp: number };
+
     const getKey = (param: CacheParam) => `${param.type}:${param.id}`;
 
-    const swrCache = new SwrCache<CacheParam, CacheValue>({
-      getValue: async (param) => ({
-        value: `value-${param.type}-${param.id}`,
-        timestamp: Date.now(),
-      }),
-      getKey,
-      ttlMs: 50,
-      refreshIntervalMs: 100,
-    });
-
-    const sourceBroadcast = source(
+    const sourceSwcCache = source(
       new WindowBroadcast(window, window),
-      swrCache,
+      new SwrCache<CacheParam, CacheValue>({
+        getValue: async (param) => ({
+          value: `value-${param.type}-${param.id}`,
+          timestamp: Date.now(),
+        }),
+        getKey,
+        ttlMs: 50,
+        refreshIntervalMs: 100,
+      }),
       "cache-namespace",
     );
 
-    const kvDataTarget = new KVDataEventTarget<CacheParam, CacheValue, string>(
-      [],
-      { getKey },
-    );
-    const sinkBroadcast = sink(
+    const sinkStore = sink(
       new WindowBroadcast(window, window),
-      kvDataTarget,
+      new KVDataEventTarget<CacheParam, CacheValue>([], {
+        getKey,
+      }),
       "cache-namespace",
     );
 
@@ -188,18 +166,79 @@ describe("source() and sink() integration", () => {
       const testParam = { type: "user", id: "123" };
 
       // Initial fetch triggers source cache
-      const initial = await kvDataTarget.getAsync(testParam);
+      const initial = await sinkStore.getAsync(testParam);
       const initialTimestamp = initial.timestamp;
 
-      // Wait for refresh
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Should have new timestamp from source refresh
-      const updated = await kvDataTarget.getAsync(testParam);
+      const updated = await sinkStore.getAsync(testParam);
       expect(updated.timestamp).toBeGreaterThan(initialTimestamp);
     } finally {
-      sourceBroadcast.destroy();
-      sinkBroadcast.destroy();
+      sourceSwcCache.destroy();
+      sinkStore.destroy();
+    }
+  });
+
+  it("should support bidirectional communication between source and sink", async () => {
+    type StateWriteMessageType = {
+      type: "state:write";
+      namespace: string;
+      detail: { param: string; value: string };
+    };
+
+    const sourceChannel = new WindowBroadcast<StateWriteMessageType>(
+      window,
+      window,
+    );
+    const sourceState = source(
+      sourceChannel,
+      new KVDataEventTarget<string, string>(),
+      "test-bidirectional",
+    );
+
+    const sinkChannel = new WindowBroadcast<StateWriteMessageType>(
+      window,
+      window,
+    );
+    const sinkState = sink(
+      sinkChannel,
+      new KVDataEventTarget<string, string>(),
+      "test-bidirectional",
+    );
+
+    try {
+      sourceChannel.onMessage((event) => {
+        const { type, namespace, detail } = event.data;
+        if (namespace !== "test-bidirectional") {
+          return;
+        }
+
+        if (type === "state:write") {
+          sourceState.set(detail.param, detail.value);
+        }
+      });
+
+      sinkChannel.postMessage({
+        type: "state:write",
+        namespace: "test-bidirectional",
+        detail: { param: "theme", value: "light" },
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(sourceState.peek("theme")).toBe("light");
+
+      expect(sinkState.peek("theme")).toBe("light");
+
+      sourceState.set("language", "en");
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(sinkState.peek("language")).toBe("en");
+    } finally {
+      sourceState.destroy();
+      sinkState.destroy();
     }
   });
 });

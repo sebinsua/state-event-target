@@ -3,7 +3,6 @@ import { KVDataEventTarget } from "../src/KVDataEventTarget";
 
 describe("KVDataEventTarget", () => {
   it("should initialize with entries", () => {
-    // Simple initialization with string keys
     const simpleStore = new KVDataEventTarget<string, number>([
       ["key1", 100],
       ["key2", 200],

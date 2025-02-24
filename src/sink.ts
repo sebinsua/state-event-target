@@ -11,7 +11,7 @@ type SinkEventHandlers<T extends SinkEventTarget> = {
 };
 
 export function sink<T extends SinkEventTarget>(
-  fromBroadcastSource: WindowBroadcast,
+  fromBroadcastSource: WindowBroadcast<any>,
   toSinkTarget: T,
   namespace: string,
   eventHandlers: SinkEventHandlers<T> = {

@@ -17,13 +17,18 @@
 
 ## Usage
 
-### Source
+### Unidirectional
+
+#### Source
 
 ```ts
 import { KVDataEventTarget, source, WindowBroadcast } from "state-event-target";
 
+const childBroadcast = new WindowBroadcast(window, () =>
+  Array.from(window.frames),
+);
 const stateSource = source(
-  new WindowBroadcast(window, () => Array.from(window.frames)),
+  childBroadcast,
   new KVDataEventTarget<string, string>(),
   "demo",
 );
@@ -31,13 +36,14 @@ const stateSource = source(
 stateSource.set("theme", "dark");
 ```
 
-### Sink
+#### Sink
 
 ```ts
 import { KVDataEventTarget, sink, WindowBroadcast } from "state-event-target";
 
+const parentBroadcast = new WindowBroadcast(window, window.parent);
 const stateSink = sink(
-  new WindowBroadcast(window, window.parent),
+  parentBroadcast,
   new KVDataEventTarget<string, string>(),
   "demo",
 );
@@ -46,6 +52,57 @@ const stateSink = sink(
 console.log(await stateSink.read("theme"));
 // Subsequent reads are synchronous
 console.log(stateSink.read("theme"));
+
+stateSink.addEventListener("state:update", (event) => {
+  console.log("state:update:", event.detail);
+});
+```
+
+### Bidirectional
+
+#### Source
+
+```ts
+import { KVDataEventTarget, source, WindowBroadcast } from "state-event-target";
+
+const writeChannel = new WindowBroadcast(window, () =>
+  Array.from(window.frames),
+);
+const stateSource = source(
+  writeChannel,
+  new KVDataEventTarget<string, string>(),
+  "demo",
+);
+
+writeChannel.onMessage((event) => {
+  const { type, namespace, detail } = event.data;
+  if (namespace !== "demo") {
+    return;
+  }
+
+  if (type === "state:write") {
+    stateSource.set(detail.param, detail.value);
+  }
+});
+```
+
+#### Sink
+
+```ts
+import { KVDataEventTarget, sink, WindowBroadcast } from "state-event-target";
+
+const writeChannel = new WindowBroadcast(window, window.parent);
+const stateSink = sink(
+  writeChannel,
+  new KVDataEventTarget<string, string>(),
+  "demo",
+);
+
+writeChannel.postMessage({
+  type: "state:write",
+  namespace: "demo",
+  detail: { param: "theme", value: "light" },
+});
 
 stateSink.addEventListener("state:update", (event) => {
   console.log("state:update:", event.detail);
