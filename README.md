@@ -17,7 +17,7 @@
 
 ## Usage
 
-### Unidirectional
+### Unidirectional
 
 #### Source
 
