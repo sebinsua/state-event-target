@@ -1,21 +1,25 @@
 import { attachPromiseMeta, PromiseWithMeta } from "./PromiseWithMeta";
 
-function defaultGetKey<Param, Key>(param: Param): Key {
-  return param as unknown as Key;
+function defaultGetKey<Param>(param: Param): Param {
+  return param;
 }
 
-export interface KVEvents<Param, Key, Value> {
+export interface KVEvents<Param, Value, Key = unknown> {
   "state:update": CustomEvent<{ param: Param; key: Key; value: Value }>;
   "state:reset": CustomEvent<void>;
 }
 
 type PromiseResolver<T> = (value: T | PromiseLike<T>) => void;
 
-interface KVDataEventTargetConfig<Param, Key> {
+interface KVDataEventTargetConfig<Param, Key = string> {
   getKey?: (param: Param) => Key;
 }
 
-export class KVDataEventTarget<Param, Value, Key = Param> extends EventTarget {
+export class KVDataEventTarget<
+  Param,
+  Value,
+  Key = unknown,
+> extends EventTarget {
   #config: Required<KVDataEventTargetConfig<Param, Key>>;
   #abortController = new AbortController();
   #promises: Map<Key, PromiseWithMeta<Value>> = new Map();
@@ -30,7 +34,7 @@ export class KVDataEventTarget<Param, Value, Key = Param> extends EventTarget {
     super();
 
     this.#config = {
-      getKey: defaultGetKey,
+      getKey: defaultGetKey as (param: Param) => Key,
       ...config,
     };
 
@@ -170,9 +174,9 @@ export class KVDataEventTarget<Param, Value, Key = Param> extends EventTarget {
     this.#abortController.abort();
   }
 
-  addEventListener<K extends keyof KVEvents<Param, Key, Value>>(
+  addEventListener<K extends keyof KVEvents<Param, Value, Key>>(
     type: K,
-    listener: (ev: KVEvents<Param, K, Value>[K]) => void,
+    listener: (ev: KVEvents<Param, Value, K>[K]) => void,
     options?: boolean | AddEventListenerOptions,
   ): void;
   addEventListener(
@@ -192,9 +196,9 @@ export class KVDataEventTarget<Param, Value, Key = Param> extends EventTarget {
     super.addEventListener(type, listener, opts);
   }
 
-  removeEventListener<K extends keyof KVEvents<Param, Key, Value>>(
+  removeEventListener<K extends keyof KVEvents<Param, Value, Key>>(
     type: K,
-    listener: (ev: KVEvents<Param, K, Value>[K]) => void,
+    listener: (ev: KVEvents<Param, Value, K>[K]) => void,
     options?: boolean | EventListenerOptions,
   ): void;
   removeEventListener(

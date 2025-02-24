@@ -2,6 +2,26 @@ import { describe, it, expect, vi } from "vitest";
 import { KVDataEventTarget } from "../src/KVDataEventTarget";
 
 describe("KVDataEventTarget", () => {
+  it("should initialize with entries", () => {
+    // Simple initialization with string keys
+    const simpleStore = new KVDataEventTarget<string, number>([
+      ["key1", 100],
+      ["key2", 200],
+    ]);
+    expect(simpleStore.peek("key1")).toBe(100);
+    expect(simpleStore.peek("key2")).toBe(200);
+
+    const customStore = new KVDataEventTarget<{ id: string }, string>(
+      [
+        [{ id: "user1" }, "Alice"],
+        [{ id: "user2" }, "Bob"],
+      ],
+      { getKey: (param) => param.id },
+    );
+    expect(customStore.peek({ id: "user1" })).toBe("Alice");
+    expect(customStore.peek({ id: "user2" })).toBe("Bob");
+  });
+
   it("should return a stable promise per key-value in getAsync", async () => {
     const store = new KVDataEventTarget<string, number>();
 

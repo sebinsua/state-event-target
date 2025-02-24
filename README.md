@@ -24,7 +24,7 @@ import { KVDataEventTarget, source, WindowBroadcast } from "state-event-target";
 
 const stateSource = source(
   new WindowBroadcast(window, () => Array.from(window.frames)),
-  new KVDataEventTarget(),
+  new KVDataEventTarget<string, string>(),
   "demo",
 );
 
@@ -38,7 +38,7 @@ import { KVDataEventTarget, sink, WindowBroadcast } from "state-event-target";
 
 const stateSink = sink(
   new WindowBroadcast(window, window.parent),
-  new KVDataEventTarget(),
+  new KVDataEventTarget<string, string>(),
   "demo",
 );
 
